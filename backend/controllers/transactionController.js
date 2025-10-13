@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Transaction = require('../models/Transaction');
 const { predictCategory } = require('../utils/aiCategorizer');
+const { DEFAULT_CURRENCY, isSupportedCurrency, convertCurrency } = require('../utils/currency');
 
 const differenceInDays = (dateA, dateB) => {
   const start = new Date(dateA);
@@ -51,26 +52,34 @@ exports.getTransactions = asyncHandler(async (req, res) => {
 
   const transactions = await Transaction.find(query).sort({ date: -1 });
 
-  res.json({ transactions });
+  res.json({
+    transactions,
+    currency: req.user.preferences?.currency || DEFAULT_CURRENCY,
+  });
 });
 
 exports.createTransaction = asyncHandler(async (req, res) => {
-  const { type, amount, description, category, date, notes, tags, source } = req.body;
+  const { type, amount, description, category, date, notes, tags, source, currency } = req.body;
+  const parsedAmount = Number(amount);
 
-  if (!type || !amount) {
+  if (!type || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
     res.status(400);
     throw new Error('Type and amount are required');
   }
 
   let aiSuggestion;
   if (!category || type === 'expense') {
-    aiSuggestion = await predictCategory(description);
+    aiSuggestion = await predictCategory(description, type);
   }
+
+  const userCurrency = req.user.preferences?.currency || DEFAULT_CURRENCY;
+  const transactionCurrency = isSupportedCurrency(currency) ? currency : userCurrency;
 
   const transaction = await Transaction.create({
     user: req.user._id,
     type,
-    amount,
+    amount: parsedAmount,
+    currency: transactionCurrency,
     description,
     date: date ? new Date(date) : Date.now(),
     notes,
@@ -110,8 +119,22 @@ exports.updateTransaction = asyncHandler(async (req, res) => {
 
   const updates = req.body;
 
+  if (typeof updates.amount !== 'undefined') {
+    const parsedAmount = Number(updates.amount);
+    if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+      res.status(400);
+      throw new Error('Amount must be a positive number');
+    }
+    updates.amount = parsedAmount;
+  }
+
+  if (updates.currency && !isSupportedCurrency(updates.currency)) {
+    res.status(400);
+    throw new Error('Unsupported currency');
+  }
+
   if (updates.description && !updates.category) {
-    const aiSuggestion = await predictCategory(updates.description);
+    const aiSuggestion = await predictCategory(updates.description, updates.type || transaction.type);
     updates.aiSuggestedCategory = aiSuggestion.category;
     updates.aiConfidence = aiSuggestion.confidence;
     if (!transaction.category || transaction.category === transaction.aiSuggestedCategory) {
@@ -147,37 +170,46 @@ exports.getMonthlySummary = asyncHandler(async (req, res) => {
   const start = new Date(targetYear, targetMonth, 1);
   const end = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
 
-  const transactions = await Transaction.aggregate([
-    {
-      $match: {
-        user: req.user._id,
-        date: { $gte: start, $lte: end },
-      },
-    },
-    {
-      $group: {
-        _id: {
-          type: '$type',
-          category: '$category',
-        },
-        total: { $sum: '$amount' },
-      },
-    },
-  ]);
+  const baseCurrency = req.user.preferences?.currency || DEFAULT_CURRENCY;
+  const transactions = await Transaction.find({
+    user: req.user._id,
+    date: { $gte: start, $lte: end },
+  });
 
-  res.json({ summary: transactions });
+  const summaryMap = new Map();
+
+  transactions.forEach((txn) => {
+    const converted = convertCurrency(txn.amount, txn.currency, baseCurrency);
+    const key = `${txn.type}-${txn.category}`;
+
+    if (!summaryMap.has(key)) {
+      summaryMap.set(key, {
+        _id: { type: txn.type, category: txn.category },
+        total: 0,
+      });
+    }
+
+    const entry = summaryMap.get(key);
+    entry.total += converted;
+  });
+
+  res.json({
+    summary: Array.from(summaryMap.values()),
+    currency: baseCurrency,
+  });
 });
 
 exports.exportTransactions = asyncHandler(async (req, res) => {
   const transactions = await Transaction.find({ user: req.user._id }).sort({ date: -1 });
 
-  const header = ['Date', 'Type', 'Category', 'Amount', 'Description', 'Notes'].join(',');
+  const header = ['Date', 'Type', 'Category', 'Amount', 'Currency', 'Description', 'Notes'].join(',');
   const rows = transactions.map((txn) =>
     [
       txn.date.toISOString(),
       txn.type,
       `"${txn.category}"`,
       txn.amount.toFixed(2),
+      txn.currency || DEFAULT_CURRENCY,
       `"${txn.description || ''}"`,
       `"${txn.notes || ''}"`,
     ].join(',')

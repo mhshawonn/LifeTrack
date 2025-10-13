@@ -17,6 +17,10 @@ const transactionSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    currency: {
+      type: String,
+      default: 'USD',
+    },
     category: {
       type: String,
       required: true,

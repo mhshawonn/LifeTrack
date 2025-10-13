@@ -8,13 +8,7 @@ import GoalProgress from '../components/GoalProgress.jsx';
 import ActivityStreaks from '../components/ActivityStreaks.jsx';
 import useDashboard from '../hooks/useDashboard.js';
 import Loader from '../components/Loader.jsx';
-
-const formatCurrency = (value) =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value || 0);
+import { DEFAULT_CURRENCY, formatCurrency } from '../utils/currency.js';
 
 const buildTrendData = (aggregate = []) => {
   const byMonth = {};
@@ -32,6 +26,11 @@ const DashboardPage = () => {
   const { metrics, loading, error } = useDashboard();
 
   const trendData = useMemo(() => buildTrendData(metrics?.monthlyTrends), [metrics]);
+  const baseCurrency = metrics?.currency || DEFAULT_CURRENCY;
+  const formatForStat = (value) =>
+    formatCurrency(value ?? 0, baseCurrency, {
+      maximumFractionDigits: 0,
+    });
 
   if (loading && !metrics) {
     return <Loader />;
@@ -48,21 +47,21 @@ const DashboardPage = () => {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <StatsCard
           title="Total income"
-          value={formatCurrency(metrics?.income)}
+          value={formatForStat(metrics?.income)}
           subtitle="All sources this month"
           icon={TrendingUp}
           accent="bg-emerald-500"
         />
         <StatsCard
           title="Total expenses"
-          value={formatCurrency(metrics?.expenses)}
+          value={formatForStat(metrics?.expenses)}
           subtitle="Tracked spending"
           icon={TrendingDown}
           accent="bg-rose-500"
         />
         <StatsCard
           title="Savings balance"
-          value={formatCurrency(metrics?.savings)}
+          value={formatForStat(metrics?.savings)}
           subtitle="Good job staying balanced"
           icon={PiggyBank}
           accent="bg-sky-500"
@@ -70,8 +69,8 @@ const DashboardPage = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[2fr_1fr]">
-        <TrendChart data={trendData} />
-        <CategoryPie data={metrics?.topCategories ?? []} />
+        <TrendChart data={trendData} currency={baseCurrency} />
+        <CategoryPie data={metrics?.topCategories ?? []} currency={baseCurrency} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { Clock, MoonStar, Palette } from 'lucide-react';
+import { Clock, Coins, MoonStar, Palette } from 'lucide-react';
 import apiClient, { handleApiError } from '../api/apiClient.js';
 import useTheme from '../hooks/useTheme.js';
 import useAuth from '../hooks/useAuth.js';
+import { CURRENCY_OPTIONS, DEFAULT_CURRENCY } from '../utils/currency.js';
 
 const SettingsPage = () => {
   const { theme, setTheme } = useTheme();
   const { user, updateUserLocally } = useAuth();
   const [preferences, setPreferences] = useState({
+    currency: DEFAULT_CURRENCY,
     dailyReminder: true,
     reminderTime: '20:00',
   });
@@ -19,7 +21,11 @@ const SettingsPage = () => {
     const fetchSettings = async () => {
       try {
         const { data } = await apiClient.get('/settings');
-        setPreferences(data.preferences);
+        setPreferences((prev) => ({
+          ...prev,
+          ...data.preferences,
+          currency: data.preferences?.currency || DEFAULT_CURRENCY,
+        }));
         if (data.preferences?.theme) {
           setTheme(data.preferences.theme);
         }
@@ -104,6 +110,40 @@ const SettingsPage = () => {
               </div>
             </button>
           ))}
+        </div>
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="glass-panel rounded-3xl border-none p-6"
+      >
+        <div className="flex items-center gap-3">
+          <Coins className="h-5 w-5 text-brand" />
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Default currency</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Pick the currency you want dashboards and summaries to use.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 w-full md:w-80">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Preferred currency
+          </label>
+          <select
+            value={preferences.currency}
+            onChange={handlePreferenceChange('currency')}
+            className="mt-2 w-full rounded-2xl border border-white/40 bg-white/80 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-white"
+          >
+            {CURRENCY_OPTIONS.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.symbol} {option.label} ({option.code})
+              </option>
+            ))}
+          </select>
         </div>
       </motion.section>
 

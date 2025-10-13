@@ -24,7 +24,7 @@ const seed = async () => {
     name: 'Demo User',
     email,
     password: 'password123',
-    preferences: { theme: 'light', dailyReminder: true },
+    preferences: { theme: 'light', currency: 'USD', dailyReminder: true },
   });
 
   const now = new Date();
@@ -34,6 +34,7 @@ const seed = async () => {
       user: demoUser._id,
       type: 'income',
       amount: 4500,
+      currency: 'USD',
       category: 'Salary',
       description: 'Monthly salary',
       date: new Date(now.getFullYear(), now.getMonth(), 1),
@@ -42,6 +43,7 @@ const seed = async () => {
       user: demoUser._id,
       type: 'expense',
       amount: 120,
+      currency: 'USD',
       category: 'Health & Fitness',
       description: 'Gym membership',
       aiSuggestedCategory: 'Health & Fitness',
@@ -52,6 +54,7 @@ const seed = async () => {
       user: demoUser._id,
       type: 'expense',
       amount: 240,
+      currency: 'USD',
       category: 'Education',
       description: 'Online course subscription',
       aiSuggestedCategory: 'Education',

@@ -61,6 +61,29 @@ LifeTrack/
    npm run build
    ```
 
+## Run with Docker
+
+1. **Build and start everything**
+   ```bash
+   docker compose up --build
+   ```
+   - Frontend: http://localhost:5173
+   - Backend API: http://localhost:5000/api
+   - MongoDB: mongodb://localhost:27017/lifetrack
+
+2. **Override environment values (optional)**
+   - Copy `docker.env.example` to `docker.env`.
+   - Update secrets (`JWT_SECRET`, `HF_API_KEY`, etc.).
+   - Run with overrides:
+     ```bash
+     docker compose --env-file docker.env up --build
+     ```
+
+3. **Stop services**
+   ```bash
+   docker compose down
+   ```
+
 ## Backend Notes
 
 - Express server (`backend/server.js`) bootstraps all feature routes:

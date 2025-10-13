@@ -4,33 +4,37 @@ import { Download, PlusCircle, Trash2, Edit3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import apiClient, { handleApiError } from '../api/apiClient.js';
 import Loader from '../components/Loader.jsx';
+import useAuth from '../hooks/useAuth.js';
+import { CURRENCY_OPTIONS, DEFAULT_CURRENCY, formatCurrency } from '../utils/currency.js';
 
-const emptyForm = {
+const createEmptyForm = (currency = DEFAULT_CURRENCY) => ({
   type: 'expense',
   amount: '',
+  currency,
   category: '',
   description: '',
   date: new Date().toISOString().slice(0, 10),
   notes: '',
-};
-
-const formatMoney = (value) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(value) || 0);
+});
 
 const TransactionsPage = () => {
+  const { user } = useAuth();
+  const userCurrency = user?.preferences?.currency || DEFAULT_CURRENCY;
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => createEmptyForm(userCurrency));
   const [filters, setFilters] = useState({ type: 'all', query: '' });
   const [editingId, setEditingId] = useState(null);
   const [aiState, setAiState] = useState({ loading: false, confidence: null });
+  const [baseCurrency, setBaseCurrency] = useState(userCurrency);
 
   const fetchTransactions = async () => {
     setLoading(true);
     try {
       const { data } = await apiClient.get('/transactions');
       setTransactions(data.transactions);
+      setBaseCurrency(data.currency || userCurrency);
     } catch (error) {
       toast.error(handleApiError(error));
     } finally {
@@ -40,14 +44,28 @@ const TransactionsPage = () => {
 
   useEffect(() => {
     fetchTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (form.type === 'expense' && form.description.trim().length > 3 && !editingId) {
+    setBaseCurrency(userCurrency);
+    if (!editingId) {
+      setForm((prev) => ({
+        ...prev,
+        currency: prev.currency || userCurrency,
+      }));
+    }
+  }, [userCurrency, editingId]);
+
+  useEffect(() => {
+    if (form.description.trim().length > 3 && !editingId) {
       const timeout = setTimeout(async () => {
         try {
           setAiState({ loading: true, confidence: null });
-          const { data } = await apiClient.post('/ai/categorize', { description: form.description });
+          const { data } = await apiClient.post('/ai/categorize', {
+            description: form.description,
+            type: form.type,
+          });
           setForm((prev) => ({
             ...prev,
             category: prev.category || data.category,
@@ -93,7 +111,7 @@ const TransactionsPage = () => {
         setTransactions((prev) => [data.transaction, ...prev]);
         toast.success('Transaction added');
       }
-      setForm(emptyForm);
+      setForm(createEmptyForm(userCurrency));
       setEditingId(null);
     } catch (error) {
       toast.error(handleApiError(error));
@@ -108,6 +126,7 @@ const TransactionsPage = () => {
     setForm({
       type: transaction.type,
       amount: transaction.amount,
+      currency: transaction.currency || userCurrency,
       category: transaction.category,
       description: transaction.description || '',
       date: transaction.date ? transaction.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -140,7 +159,7 @@ const TransactionsPage = () => {
   }, [transactions, filters]);
 
   const resetForm = () => {
-    setForm(emptyForm);
+    setForm(createEmptyForm(userCurrency));
     setEditingId(null);
     setAiState({ loading: false, confidence: null });
   };
@@ -169,6 +188,9 @@ const TransactionsPage = () => {
             <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
               Track your {form.type === 'income' ? 'income' : 'spending'}
             </h2>
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+              Default currency: {baseCurrency}
+            </p>
           </div>
           <button
             onClick={exportCsv}
@@ -206,6 +228,23 @@ const TransactionsPage = () => {
               onChange={handleChange('amount')}
               className="w-full rounded-2xl border border-white/40 bg-white/80 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-white"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Currency
+            </label>
+            <select
+              value={form.currency}
+              onChange={handleChange('currency')}
+              className="w-full rounded-2xl border border-white/40 bg-white/80 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-white"
+            >
+              {CURRENCY_OPTIONS.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.symbol} {option.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-2">
@@ -347,7 +386,10 @@ const TransactionsPage = () => {
                   <td className="px-6 py-4">{txn.description || '—'}</td>
                   <td className="px-6 py-4 text-right font-semibold">
                     {txn.type === 'expense' ? '-' : '+'}
-                    {formatMoney(txn.amount)}
+                    {formatCurrency(txn.amount, txn.currency || baseCurrency)}
+                    <span className="ml-1 text-xs font-medium text-slate-400 dark:text-slate-500">
+                      {txn.currency || baseCurrency}
+                    </span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">

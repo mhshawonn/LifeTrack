@@ -1,9 +1,10 @@
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import { motion } from 'framer-motion';
+import { DEFAULT_CURRENCY, formatCurrency } from '../utils/currency.js';
 
 const COLORS = ['#4C6EF5', '#38BDF8', '#F97316', '#22C55E', '#E11D48'];
 
-const CategoryPie = ({ data }) => (
+const CategoryPie = ({ data, currency = DEFAULT_CURRENCY }) => (
   <motion.div
     initial={{ opacity: 0, y: 16 }}
     animate={{ opacity: 1, y: 0 }}
@@ -34,7 +35,7 @@ const CategoryPie = ({ data }) => (
               <Cell key={entry._id} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} />
+          <Tooltip formatter={(value) => formatCurrency(value, currency)} />
           <Legend />
         </PieChart>
       </ResponsiveContainer>

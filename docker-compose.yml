@@ -1,0 +1,41 @@
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: lifetrack-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "27017:27017"
+
+  backend:
+    build:
+      context: ./backend
+    container_name: lifetrack-backend
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    environment:
+      - PORT=5000
+      - MONGO_URI=${MONGO_URI:-mongodb://mongo:27017/lifetrack}
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwt}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - HF_API_KEY=${HF_API_KEY:-}
+      - HF_MODEL=${HF_MODEL:-facebook/bart-large-mnli}
+    ports:
+      - "5000:5000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://backend:5000/api}
+    container_name: lifetrack-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  mongo-data:

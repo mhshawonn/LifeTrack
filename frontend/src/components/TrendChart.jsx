@@ -1,7 +1,8 @@
 import { ResponsiveContainer, LineChart, Line, CartesianGrid, Tooltip, XAxis, YAxis, Legend } from 'recharts';
 import { motion } from 'framer-motion';
+import { DEFAULT_CURRENCY, formatCurrency } from '../utils/currency.js';
 
-const TrendChart = ({ data }) => (
+const TrendChart = ({ data, currency = DEFAULT_CURRENCY }) => (
   <motion.div
     initial={{ opacity: 0, y: 16 }}
     animate={{ opacity: 1, y: 0 }}
@@ -24,8 +25,11 @@ const TrendChart = ({ data }) => (
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.2)" />
           <XAxis dataKey="month" stroke="#94a3b8" />
-          <YAxis stroke="#94a3b8" />
-          <Tooltip />
+          <YAxis
+            stroke="#94a3b8"
+            tickFormatter={(value) => formatCurrency(value, currency, { maximumFractionDigits: 0 })}
+          />
+          <Tooltip formatter={(value) => formatCurrency(value, currency)} />
           <Legend />
           <Line type="monotone" dataKey="income" stroke="#22c55e" strokeWidth={3} dot={false} />
           <Line type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={3} dot={false} />

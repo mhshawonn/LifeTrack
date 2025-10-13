@@ -8,6 +8,10 @@ const preferencesSchema = new mongoose.Schema(
       enum: ['light', 'dark', 'system'],
       default: 'system',
     },
+    currency: {
+      type: String,
+      default: 'USD',
+    },
     dailyReminder: {
       type: Boolean,
       default: true,
